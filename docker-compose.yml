@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  mirage:
+    build: .
+    ports:
+      - "9050:9050"
+    environment:
+      - PORT=9050
+      - DATA_DIR=/data
+      - MIRAGE_LICENSE_KEY=
+    volumes:
+      - mirage_data:/data
+    restart: unless-stopped
+volumes:
+  mirage_data:
