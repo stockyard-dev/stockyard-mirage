@@ -29,15 +29,21 @@ func (s *Server) ListenAndServe(addr string) error {
 }
 
 func (s *Server) routes() {
+	// Admin API
 	s.mux.HandleFunc("GET /health", s.handleHealth)
 	s.mux.HandleFunc("GET /api/version", s.handleVersion)
 	s.mux.HandleFunc("GET /api/limits", s.handleLimits)
+	s.mux.HandleFunc("GET /api/endpoints", s.handleListEndpoints)
+	s.mux.HandleFunc("POST /api/endpoints", s.handleCreateEndpoint)
+	s.mux.HandleFunc("GET /api/endpoints/{id}", s.handleGetEndpoint)
+	s.mux.HandleFunc("PUT /api/endpoints/{id}", s.handleUpdateEndpoint)
+	s.mux.HandleFunc("DELETE /api/endpoints/{id}", s.handleDeleteEndpoint)
+	s.mux.HandleFunc("GET /api/logs", s.handleListLogs)
+	s.mux.HandleFunc("GET /api/stats", s.handleStats)
+	// Dashboard
 	s.mux.HandleFunc("GET /", s.handleUI)
-	s.mux.HandleFunc("GET /api/items", s.handleListItems)
-	s.mux.HandleFunc("POST /api/items", s.handleCreateItem)
-	s.mux.HandleFunc("GET /api/items/{id}", s.handleGetItem)
-	s.mux.HandleFunc("PUT /api/items/{id}", s.handleUpdateItem)
-	s.mux.HandleFunc("DELETE /api/items/{id}", s.handleDeleteItem)
+	// Mock catch-all — must be last
+	s.mux.HandleFunc("/mock/", s.handleMock)
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -53,6 +59,15 @@ func (s *Server) handleLimits(w http.ResponseWriter, r *http.Request) {
 		"tier":        s.limits.Tier,
 		"description": s.limits.Description,
 		"is_pro":      s.limits.IsPro(),
+	})
+}
+
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	endpoints, _ := s.db.CountEndpoints()
+	logs, _ := s.db.CountLogs()
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"endpoints": endpoints,
+		"logs":      logs,
 	})
 }
 
