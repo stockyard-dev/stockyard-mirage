@@ -1,43 +1,43 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 
-	"github.com/stockyard-dev/stockyard-mirage/internal/license"
 	"github.com/stockyard-dev/stockyard-mirage/internal/server"
 	"github.com/stockyard-dev/stockyard-mirage/internal/store"
 )
 
 func main() {
-	port := getEnv("PORT", "9050")
-	dataDir := getEnv("DATA_DIR", "./data")
-	licenseKey := os.Getenv("MIRAGE_LICENSE_KEY")
-
-	tier := "free"
-	if licenseKey != "" {
-		if license.Validate(licenseKey) {
-			tier = "pro"
-			log.Println("License valid — Pro tier active")
-		} else {
-			log.Println("Warning: invalid license key, running as free tier")
-		}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9050"
+	}
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "./mirage-data"
 	}
 
 	db, err := store.Open(dataDir)
 	if err != nil {
-		log.Fatalf("store: %v", err)
+		log.Fatalf("mirage: open database: %v", err)
 	}
 	defer db.Close()
 
-	srv := server.New(db, tier)
-	log.Printf("Stockyard Mirage listening on :%s (tier: %s)", port, tier)
-	log.Fatal(srv.ListenAndServe(":" + port))
-}
+	srv := server.New(db)
 
-func getEnv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	fmt.Printf("\n  Mirage — Self-hosted mock server\n")
+	fmt.Printf("  ─────────────────────────────────\n")
+	fmt.Printf("  Dashboard:  http://localhost:%s/ui\n", port)
+	fmt.Printf("  API:        http://localhost:%s/api\n", port)
+	fmt.Printf("  Mock base:  http://localhost:%s/mock\n", port)
+	fmt.Printf("  Data:       %s\n", dataDir)
+	fmt.Printf("  ─────────────────────────────────\n\n")
+
+	log.Printf("mirage: listening on :%s", port)
+	if err := http.ListenAndServe(":"+port, srv); err != nil {
+		log.Fatalf("mirage: %v", err)
 	}
-	return fallback
 }
