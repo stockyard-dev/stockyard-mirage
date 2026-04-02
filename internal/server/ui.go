@@ -1,149 +1,30 @@
 package server
-
-var dashboardHTML = []byte(`<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stockyard Mirage</title>
-<style>
-:root{--bg:#1a1410;--surface:#241c15;--border:#3d2e1e;--rust:#c4622d;--leather:#8b5e3c;--cream:#f5e6c8;--muted:#7a6550;--text:#e8d5b0}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace,sans-serif;min-height:100vh}
-header{background:var(--surface);border-bottom:1px solid var(--border);padding:1rem 2rem;display:flex;align-items:center;gap:1rem}
-.logo{color:var(--rust);font-size:1.25rem;font-weight:700}
-.badge{background:var(--rust);color:var(--cream);font-size:0.65rem;padding:0.2rem 0.5rem;border-radius:3px;font-weight:600;text-transform:uppercase}
-main{max-width:1100px;margin:0 auto;padding:2rem}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.25rem;text-align:center}
-.stat-value{font-size:1.75rem;font-weight:700;color:var(--rust)}
-.stat-label{font-size:0.75rem;color:var(--muted);margin-top:0.25rem;text-transform:uppercase;letter-spacing:0.05em}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.5rem}
-.card h2{font-size:0.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1rem}
-.form-row{display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap}
-select,input,textarea{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.5rem 0.75rem;border-radius:4px;font-family:inherit;font-size:0.85rem}
-textarea{width:100%;min-height:80px;resize:vertical}
-input[type=number]{width:90px}
-.btn{background:var(--rust);color:var(--cream);border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.85rem;font-weight:600}
-.btn:hover{opacity:0.85}
-.btn-sm{padding:0.25rem 0.6rem;font-size:0.75rem}
-.btn-danger{background:#7a2020}
-table{width:100%;border-collapse:collapse;font-size:0.82rem}
-th{text-align:left;color:var(--muted);padding:0.5rem;border-bottom:1px solid var(--border);font-size:0.75rem;text-transform:uppercase}
-td{padding:0.5rem;border-bottom:1px solid var(--border)}
-.method{font-weight:700;color:var(--rust)}
-.path{color:var(--cream);font-family:monospace}
-.status{font-size:0.75rem;padding:0.15rem 0.4rem;border-radius:3px;background:var(--bg);border:1px solid var(--border)}
-.empty{color:var(--muted);font-size:0.85rem;padding:1rem 0;text-align:center}
-.full{grid-column:1/-1}
-.mock-url{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:0.75rem;font-family:monospace;font-size:0.8rem;color:var(--leather);word-break:break-all}
-</style>
-</head>
-<body>
-<header>
-  <span class="logo">&#x2B21; Stockyard</span>
-  <span style="color:var(--muted)">/</span>
-  <span style="color:var(--cream);font-weight:600">Mirage</span>
-  <span class="badge">API Mock</span>
-</header>
-<main>
-  <div class="stats">
-    <div class="stat"><div class="stat-value" id="s-endpoints">0</div><div class="stat-label">Endpoints</div></div>
-    <div class="stat"><div class="stat-value" id="s-logs">0</div><div class="stat-label">Requests Logged</div></div>
-    <div class="stat"><div class="stat-value" id="s-tier">FREE</div><div class="stat-label">Tier</div></div>
-  </div>
-  <div class="grid">
-    <div class="card">
-      <h2>Add Endpoint</h2>
-      <div class="form-row">
-        <select id="f-method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>*</option></select>
-        <input id="f-path" placeholder="/api/users" style="flex:1">
-      </div>
-      <div class="form-row">
-        <input id="f-status" type="number" value="200">
-        <input id="f-ct" placeholder="application/json" style="flex:1">
-        <input id="f-delay" type="number" value="0" placeholder="delay ms">
-      </div>
-      <textarea id="f-body">{}</textarea>
-      <div style="margin-top:0.75rem"><button class="btn" onclick="createEndpoint()">Add Endpoint</button></div>
-    </div>
-    <div class="card">
-      <h2>Mock Base URL</h2>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.75rem">Point your app at this prefix. Requests are matched to your configured endpoints.</p>
-      <div class="mock-url" id="mock-url">loading...</div>
-      <p style="font-size:0.75rem;color:var(--muted);margin-top:0.75rem">Example: GET /mock/api/users matches endpoint GET /api/users</p>
-    </div>
-    <div class="card full">
-      <h2>Endpoints</h2>
-      <table><thead><tr><th>Method</th><th>Path</th><th>Status</th><th>Content-Type</th><th>Delay</th><th></th></tr></thead>
-      <tbody id="endpoints-body"><tr><td colspan="6" class="empty">No endpoints yet</td></tr></tbody></table>
-    </div>
-    <div class="card full">
-      <h2>Request Log</h2>
-      <table><thead><tr><th>Method</th><th>Path</th><th>Body</th><th>Time</th></tr></thead>
-      <tbody id="logs-body"><tr><td colspan="4" class="empty">No requests yet</td></tr></tbody></table>
-    </div>
-  </div>
-</main>
+import "net/http"
+func(s *Server)dashboard(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","text/html; charset=utf-8");w.Write([]byte(dashHTML))}
+const dashHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mirage</title>
+<style>:root{--bg:#1a1410;--bg2:#241e18;--bg3:#2e261e;--rust:#c45d2c;--rl:#e8753a;--leather:#a0845c;--cream:#f0e6d3;--cd:#bfb5a3;--cm:#7a7060;--gold:#d4a843;--green:#4a9e5c;--red:#c44040;--mono:'JetBrains Mono',Consolas,monospace;--serif:'Libre Baskerville',Georgia,serif}*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--cream);font-family:var(--mono);font-size:13px;line-height:1.6}.hdr{padding:.6rem 1.2rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}.hdr h1{font-family:var(--serif);font-size:1rem}.hdr h1 span{color:var(--rl)}.main{max-width:800px;margin:0 auto;padding:1rem}.btn{font-family:var(--mono);font-size:.68rem;padding:.3rem .6rem;border:1px solid;cursor:pointer;background:transparent}.btn-p{border-color:var(--rust);color:var(--rl)}.btn-p:hover{background:var(--rust);color:var(--cream)}.btn-d{border-color:var(--bg3);color:var(--cm)}.overview{display:flex;gap:1.5rem;margin-bottom:1rem;font-size:.7rem;color:var(--leather)}.overview .stat b{display:block;font-size:1.2rem;color:var(--cream)}.card{background:var(--bg2);border:1px solid var(--bg3);padding:.6rem;margin-bottom:.4rem;cursor:pointer;transition:.1s}.card:hover{background:var(--bg3)}.card h3{font-size:.8rem;margin-bottom:.15rem}.card-meta{font-size:.65rem;color:var(--cm);display:flex;gap:.7rem}.ep-row{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-bottom:1px solid var(--bg3);font-size:.72rem}.ep-method{width:45px;font-weight:700;flex-shrink:0;font-size:.65rem}.m-GET{color:var(--green)}.m-POST{color:var(--gold)}.m-PUT{color:var(--rl)}.m-DELETE{color:var(--red)}.ep-path{flex:1;color:var(--rl)}.ep-status{font-size:.65rem}.s-2{color:var(--green)}.s-4{color:var(--gold)}.s-5{color:var(--red)}.req-row{font-size:.68rem;padding:.25rem .5rem;border-bottom:1px solid var(--bg3);display:flex;gap:.5rem}.empty{text-align:center;padding:2rem;color:var(--cm);font-style:italic;font-family:var(--serif)}.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:var(--bg2);border:1px solid var(--bg3);padding:1.5rem;width:95%;max-width:600px;max-height:90vh;overflow-y:auto}.modal h2{font-family:var(--serif);font-size:.9rem;margin-bottom:1rem}label.fl{display:block;font-size:.65rem;color:var(--leather);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem;margin-top:.5rem}input[type=text],input[type=number],textarea,select{background:var(--bg);border:1px solid var(--bg3);color:var(--cream);padding:.35rem .5rem;font-family:var(--mono);font-size:.78rem;width:100%;outline:none}textarea{resize:vertical;min-height:80px}.form-row{display:flex;gap:.5rem}.form-row>*{flex:1}</style>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head><body><div class="hdr"><h1><span>Mirage</span></h1><div style="display:flex;gap:.3rem"><button class="btn btn-p" onclick="showNewSvc()">+ Service</button><button class="btn btn-p" onclick="showNewEP()">+ Endpoint</button></div></div>
+<div class="main"><div class="overview" id="ov"></div><div id="svcList"></div><div id="detail" style="display:none;margin-top:1rem"></div></div><div id="modal"></div>
 <script>
-document.getElementById('mock-url').textContent = window.location.origin + '/mock';
-
-async function api(method, path, body) {
-  const opts = {method, headers:{'Content-Type':'application/json'}};
-  if (body) opts.body = JSON.stringify(body);
-  const r = await fetch(path, opts);
-  return r.json();
-}
-
-async function load() {
-  const [stats, limits] = await Promise.all([api('GET','/api/stats'), api('GET','/api/limits')]);
-  document.getElementById('s-endpoints').textContent = stats.endpoints || 0;
-  document.getElementById('s-logs').textContent = stats.logs || 0;
-  document.getElementById('s-tier').textContent = (limits.tier||'free').toUpperCase();
-  await loadEndpoints();
-  await loadLogs();
-}
-
-async function loadEndpoints() {
-  const data = await api('GET', '/api/endpoints');
-  const tbody = document.getElementById('endpoints-body');
-  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No endpoints yet</td></tr>'; return; }
-  tbody.innerHTML = data.map(function(e) { return '<tr><td><span class="method">'+e.method+'</span></td><td class="path">'+e.path+'</td><td><span class="status">'+e.status_code+'</span></td><td style="font-size:0.75rem;color:var(--muted)">'+e.content_type+'</td><td style="font-size:0.75rem;color:var(--muted)">'+e.delay_ms+'ms</td><td><button class="btn btn-sm btn-danger" onclick="deleteEndpoint('+e.id+')">Del</button></td></tr>'; }).join('');
-}
-
-async function loadLogs() {
-  const data = await api('GET', '/api/logs?limit=50');
-  const tbody = document.getElementById('logs-body');
-  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No requests yet</td></tr>'; return; }
-  tbody.innerHTML = data.map(function(l) { return '<tr><td><span class="method">'+l.method+'</span></td><td class="path">'+l.path+'</td><td style="font-size:0.75rem;color:var(--muted)">'+String(l.request_body||'').substring(0,60)+'</td><td style="font-size:0.75rem;color:var(--muted)">'+new Date(l.responded_at).toLocaleTimeString()+'</td></tr>'; }).join('');
-}
-
-async function createEndpoint() {
-  var e = {
-    method: document.getElementById('f-method').value,
-    path: document.getElementById('f-path').value.trim(),
-    status_code: parseInt(document.getElementById('f-status').value)||200,
-    content_type: document.getElementById('f-ct').value.trim()||'application/json',
-    delay_ms: parseInt(document.getElementById('f-delay').value)||0,
-    response_body: document.getElementById('f-body').value.trim(),
-  };
-  if (!e.path) { alert('Path required'); return; }
-  var res = await api('POST', '/api/endpoints', e);
-  if (res.error) { alert(res.error); return; }
-  document.getElementById('f-path').value = '';
-  document.getElementById('f-body').value = '{}';
-  load();
-}
-
-async function deleteEndpoint(id) {
-  if (!confirm('Delete endpoint?')) return;
-  await api('DELETE', '/api/endpoints/'+id);
-  load();
-}
-
-load();
-setInterval(loadLogs, 5000);
-</script>
-</body>
-</html>`)
+let svcs=[],curSvc='';
+async function api(u,o){return(await fetch(u,o)).json()}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function timeAgo(d){if(!d)return'';const s=Math.floor((Date.now()-new Date(d))/1e3);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';return Math.floor(s/3600)+'h ago'}
+async function init(){const[sd,dd]=await Promise.all([api('/api/stats'),api('/api/services')]);svcs=dd.services||[];
+document.getElementById('ov').innerHTML='<div class="stat"><b>'+sd.services+'</b>Services</div><div class="stat"><b>'+sd.endpoints+'</b>Endpoints</div><div class="stat"><b>'+sd.requests+'</b>Requests</div>';
+document.getElementById('svcList').innerHTML=svcs.length?svcs.map(s=>'<div class="card" onclick="openSvc(\''+s.id+'\')"><h3>'+esc(s.name)+(s.prefix?' <span style="color:var(--cm);font-size:.7rem">'+esc(s.prefix)+'</span>':'')+'</h3><div class="card-meta"><span>'+s.endpoint_count+' endpoints</span></div></div>').join(''):'<div class="empty">No mock services yet. Create one to define mock endpoints.</div>'}
+async function openSvc(id){curSvc=id;const[svc,ed]=await Promise.all([api('/api/services/'+id),api('/api/services/'+id+'/endpoints')]);
+const eps=(ed.endpoints||[]).map(e=>'<div class="ep-row"><span class="ep-method m-'+e.method+'">'+e.method+'</span><span class="ep-path">/mock'+esc(e.path)+'</span><span class="ep-status s-'+String(e.status_code)[0]+'">'+e.status_code+'</span>'+(e.delay_ms?'<span style="color:var(--cm);font-size:.6rem">'+e.delay_ms+'ms</span>':'')+'<span style="cursor:pointer;font-size:.55rem;color:var(--cm)" onclick="delEP(\''+e.id+'\')">del</span></div>').join('');
+document.getElementById('detail').style.display='block';
+document.getElementById('detail').innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:.5rem"><span style="font-size:.75rem;color:var(--leather)">'+esc(svc.name)+'</span><button class="btn btn-d" onclick="if(confirm(\'Delete?\'))delSvc(\''+id+'\')">Del</button></div><div style="font-size:.65rem;color:var(--cm);margin-bottom:.5rem">Mock base: <span style="color:var(--rl)">/mock</span></div>'+(eps||'<div class="empty" style="padding:1rem">No endpoints.</div>')}
+async function delSvc(id){await api('/api/services/'+id,{method:'DELETE'});curSvc='';document.getElementById('detail').style.display='none';init()}
+async function delEP(id){await api('/api/endpoints/'+id,{method:'DELETE'});openSvc(curSvc);init()}
+function showNewSvc(){document.getElementById('modal').innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h2>New Mock Service</h2><label class="fl">Name</label><input type="text" id="ns-name" placeholder="Payment API"><label class="fl">Description</label><input type="text" id="ns-desc"><div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn btn-p" onclick="saveSvc()">Create</button><button class="btn btn-d" onclick="closeModal()">Cancel</button></div></div></div>'}
+async function saveSvc(){const b={name:document.getElementById('ns-name').value,description:document.getElementById('ns-desc').value};if(!b.name){alert('Required');return};const r=await api('/api/services',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});curSvc=r.id;closeModal();init();openSvc(r.id)}
+function showNewEP(){if(!curSvc){alert('Select a service first');return}
+document.getElementById('modal').innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h2>New Mock Endpoint</h2><div class="form-row"><div><label class="fl">Method</label><select id="ne-method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option></select></div><div><label class="fl">Path</label><input type="text" id="ne-path" placeholder="/api/users"></div></div><div class="form-row"><div><label class="fl">Status Code</label><input type="number" id="ne-status" value="200"></div><div><label class="fl">Delay (ms)</label><input type="number" id="ne-delay" value="0"></div></div><label class="fl">Response Body</label><textarea id="ne-body" rows="5" placeholder=\'{"users":[{"id":1,"name":"Alice"}]}\'></textarea><div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn btn-p" onclick="saveEP()">Create</button><button class="btn btn-d" onclick="closeModal()">Cancel</button></div></div></div>'}
+async function saveEP(){const b={service_id:curSvc,method:document.getElementById('ne-method').value,path:document.getElementById('ne-path').value,status_code:parseInt(document.getElementById('ne-status').value)||200,delay_ms:parseInt(document.getElementById('ne-delay').value)||0,response_body:document.getElementById('ne-body').value};if(!b.path){alert('Path required');return};await api('/api/endpoints',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});closeModal();openSvc(curSvc);init()}
+function closeModal(){document.getElementById('modal').innerHTML=''}
+init()
+</script></body></html>`

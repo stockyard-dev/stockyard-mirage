@@ -1,82 +1,41 @@
 package server
+import ("encoding/json";"io";"log";"net/http";"strings";"time";"github.com/stockyard-dev/stockyard-mirage/internal/store")
+type Server struct{db *store.DB;mux *http.ServeMux}
+func New(db *store.DB)*Server{s:=&Server{db:db,mux:http.NewServeMux()}
+s.mux.HandleFunc("GET /api/services",s.listServices);s.mux.HandleFunc("POST /api/services",s.createService);s.mux.HandleFunc("GET /api/services/{id}",s.getService);s.mux.HandleFunc("DELETE /api/services/{id}",s.deleteService)
+s.mux.HandleFunc("GET /api/services/{id}/endpoints",s.listEndpoints);s.mux.HandleFunc("POST /api/endpoints",s.createEndpoint);s.mux.HandleFunc("DELETE /api/endpoints/{id}",s.deleteEndpoint)
+s.mux.HandleFunc("GET /api/endpoints/{id}/requests",s.listRequests);s.mux.HandleFunc("GET /api/requests/recent",s.recentRequests)
+s.mux.HandleFunc("GET /api/stats",s.stats);s.mux.HandleFunc("GET /api/health",s.health)
+s.mux.HandleFunc("GET /ui",s.dashboard);s.mux.HandleFunc("GET /ui/",s.dashboard);s.mux.HandleFunc("GET /",s.root);return s}
+func(s *Server)ServeHTTP(w http.ResponseWriter,r *http.Request){
+if strings.HasPrefix(r.URL.Path,"/mock/"){s.handleMock(w,r);return};s.mux.ServeHTTP(w,r)}
+func wj(w http.ResponseWriter,c int,v any){w.Header().Set("Content-Type","application/json");w.WriteHeader(c);json.NewEncoder(w).Encode(v)}
+func we(w http.ResponseWriter,c int,m string){wj(w,c,map[string]string{"error":m})}
+func(s *Server)root(w http.ResponseWriter,r *http.Request){if r.URL.Path!="/"{http.NotFound(w,r);return};http.Redirect(w,r,"/ui",302)}
+func(s *Server)listServices(w http.ResponseWriter,r *http.Request){wj(w,200,map[string]any{"services":oe(s.db.ListServices())})}
+func(s *Server)createService(w http.ResponseWriter,r *http.Request){var svc store.MockService;json.NewDecoder(r.Body).Decode(&svc);if svc.Name==""{we(w,400,"name required");return};s.db.CreateService(&svc);wj(w,201,s.db.GetService(svc.ID))}
+func(s *Server)getService(w http.ResponseWriter,r *http.Request){svc:=s.db.GetService(r.PathValue("id"));if svc==nil{we(w,404,"not found");return};wj(w,200,svc)}
+func(s *Server)deleteService(w http.ResponseWriter,r *http.Request){s.db.DeleteService(r.PathValue("id"));wj(w,200,map[string]string{"deleted":"ok"})}
+func(s *Server)listEndpoints(w http.ResponseWriter,r *http.Request){wj(w,200,map[string]any{"endpoints":oe(s.db.ListEndpoints(r.PathValue("id")))})}
+func(s *Server)createEndpoint(w http.ResponseWriter,r *http.Request){var ep store.Endpoint;json.NewDecoder(r.Body).Decode(&ep);if ep.Path==""{we(w,400,"path required");return};s.db.CreateEndpoint(&ep);wj(w,201,s.db.GetEndpoint(ep.ID))}
+func(s *Server)deleteEndpoint(w http.ResponseWriter,r *http.Request){s.db.DeleteEndpoint(r.PathValue("id"));wj(w,200,map[string]string{"deleted":"ok"})}
+func(s *Server)listRequests(w http.ResponseWriter,r *http.Request){wj(w,200,map[string]any{"requests":oe(s.db.ListRequests(r.PathValue("id"),50))})}
+func(s *Server)recentRequests(w http.ResponseWriter,r *http.Request){wj(w,200,map[string]any{"requests":oe(s.db.RecentRequests(50))})}
+func(s *Server)stats(w http.ResponseWriter,r *http.Request){wj(w,200,s.db.Stats())}
+func(s *Server)health(w http.ResponseWriter,r *http.Request){st:=s.db.Stats();wj(w,200,map[string]any{"status":"ok","service":"mirage","endpoints":st.Endpoints,"requests":st.Requests})}
 
-import (
-	"encoding/json"
-	"net/http"
+func(s *Server)handleMock(w http.ResponseWriter,r *http.Request){
+path:=strings.TrimPrefix(r.URL.Path,"/mock")
+ep:=s.db.MatchEndpoint(r.Method,path)
+bodyBytes,_:=io.ReadAll(r.Body)
+if ep==nil{
+s.db.LogRequest(&store.RequestLog{Method:r.Method,Path:path,Body:string(bodyBytes),IP:r.RemoteAddr,StatusSent:404})
+we(w,404,"no matching mock endpoint");return}
+if ep.DelayMs>0{time.Sleep(time.Duration(ep.DelayMs)*time.Millisecond)}
+for k,v:=range ep.ResponseHeaders{w.Header().Set(k,v)}
+if ct:=w.Header().Get("Content-Type");ct==""{w.Header().Set("Content-Type","application/json")}
+s.db.LogRequest(&store.RequestLog{EndpointID:ep.ID,Method:r.Method,Path:path,Body:string(bodyBytes),IP:r.RemoteAddr,StatusSent:ep.StatusCode})
+w.WriteHeader(ep.StatusCode);w.Write([]byte(ep.ResponseBody))}
 
-	"github.com/stockyard-dev/stockyard-mirage/internal/store"
-)
-
-type Server struct {
-	db     *store.DB
-	limits Limits
-	mux    *http.ServeMux
-}
-
-func New(db *store.DB, tier string) *Server {
-	s := &Server{
-		db:     db,
-		limits: LimitsFor(tier),
-		mux:    http.NewServeMux(),
-	}
-	s.routes()
-	return s
-}
-
-func (s *Server) ListenAndServe(addr string) error {
-	srv := &http.Server{Addr: addr, Handler: s.mux}
-	return srv.ListenAndServe()
-}
-
-func (s *Server) routes() {
-	// Admin API
-	s.mux.HandleFunc("GET /health", s.handleHealth)
-	s.mux.HandleFunc("GET /api/version", s.handleVersion)
-	s.mux.HandleFunc("GET /api/limits", s.handleLimits)
-	s.mux.HandleFunc("GET /api/endpoints", s.handleListEndpoints)
-	s.mux.HandleFunc("POST /api/endpoints", s.handleCreateEndpoint)
-	s.mux.HandleFunc("GET /api/endpoints/{id}", s.handleGetEndpoint)
-	s.mux.HandleFunc("PUT /api/endpoints/{id}", s.handleUpdateEndpoint)
-	s.mux.HandleFunc("DELETE /api/endpoints/{id}", s.handleDeleteEndpoint)
-	s.mux.HandleFunc("GET /api/logs", s.handleListLogs)
-	s.mux.HandleFunc("GET /api/stats", s.handleStats)
-	// Dashboard
-	s.mux.HandleFunc("GET /", s.handleUI)
-	// Mock catch-all — must be last
-	s.mux.HandleFunc("/mock/", s.handleMock)
-}
-
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "stockyard-mirage"})
-}
-
-func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"version": "0.1.0", "service": "stockyard-mirage"})
-}
-
-func (s *Server) handleLimits(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"tier":        s.limits.Tier,
-		"description": s.limits.Description,
-		"is_pro":      s.limits.IsPro(),
-	})
-}
-
-func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
-	endpoints, _ := s.db.CountEndpoints()
-	logs, _ := s.db.CountLogs()
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"endpoints": endpoints,
-		"logs":      logs,
-	})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
-}
+func oe[T any](s []T)[]T{if s==nil{return[]T{}};return s}
+func init(){log.SetFlags(log.LstdFlags|log.Lshortfile)}
