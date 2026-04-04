@@ -1,31 +1,57 @@
 package server
 import "net/http"
-func(s *Server)dashboard(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","text/html; charset=utf-8");w.Write([]byte(dashHTML))}
-const dashHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mirage</title>
-<style>:root{--bg:#1a1410;--bg2:#241e18;--bg3:#2e261e;--rust:#c45d2c;--rl:#e8753a;--leather:#a0845c;--cream:#f0e6d3;--cd:#bfb5a3;--cm:#7a7060;--gold:#d4a843;--green:#4a9e5c;--red:#c44040;--mono:'JetBrains Mono',Consolas,monospace;--serif:'Libre Baskerville',Georgia,serif}*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--cream);font-family:var(--mono);font-size:13px;line-height:1.6}.hdr{padding:.6rem 1.2rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}.hdr h1{font-family:var(--serif);font-size:1rem}.hdr h1 span{color:var(--rl)}.main{max-width:800px;margin:0 auto;padding:1rem}.btn{font-family:var(--mono);font-size:.68rem;padding:.3rem .6rem;border:1px solid;cursor:pointer;background:transparent}.btn-p{border-color:var(--rust);color:var(--rl)}.btn-p:hover{background:var(--rust);color:var(--cream)}.btn-d{border-color:var(--bg3);color:var(--cm)}.overview{display:flex;gap:1.5rem;margin-bottom:1rem;font-size:.7rem;color:var(--leather)}.overview .stat b{display:block;font-size:1.2rem;color:var(--cream)}.card{background:var(--bg2);border:1px solid var(--bg3);padding:.6rem;margin-bottom:.4rem;cursor:pointer;transition:.1s}.card:hover{background:var(--bg3)}.card h3{font-size:.8rem;margin-bottom:.15rem}.card-meta{font-size:.65rem;color:var(--cm);display:flex;gap:.7rem}.ep-row{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-bottom:1px solid var(--bg3);font-size:.72rem}.ep-method{width:45px;font-weight:700;flex-shrink:0;font-size:.65rem}.m-GET{color:var(--green)}.m-POST{color:var(--gold)}.m-PUT{color:var(--rl)}.m-DELETE{color:var(--red)}.ep-path{flex:1;color:var(--rl)}.ep-status{font-size:.65rem}.s-2{color:var(--green)}.s-4{color:var(--gold)}.s-5{color:var(--red)}.req-row{font-size:.68rem;padding:.25rem .5rem;border-bottom:1px solid var(--bg3);display:flex;gap:.5rem}.empty{text-align:center;padding:2rem;color:var(--cm);font-style:italic;font-family:var(--serif)}.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:var(--bg2);border:1px solid var(--bg3);padding:1.5rem;width:95%;max-width:600px;max-height:90vh;overflow-y:auto}.modal h2{font-family:var(--serif);font-size:.9rem;margin-bottom:1rem}label.fl{display:block;font-size:.65rem;color:var(--leather);text-transform:uppercase;letter-spacing:1px;margin-bottom:.2rem;margin-top:.5rem}input[type=text],input[type=number],textarea,select{background:var(--bg);border:1px solid var(--bg3);color:var(--cream);padding:.35rem .5rem;font-family:var(--mono);font-size:.78rem;width:100%;outline:none}textarea{resize:vertical;min-height:80px}.form-row{display:flex;gap:.5rem}.form-row>*{flex:1}</style>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital@0;1&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-</head><body><div class="hdr"><h1><span>Mirage</span></h1><div style="display:flex;gap:.3rem"><button class="btn btn-p" onclick="showNewSvc()">+ Service</button><button class="btn btn-p" onclick="showNewEP()">+ Endpoint</button></div></div>
-<div class="main"><div id="upgrade-banner" style="display:none;background:#241e18;border:1px solid #8b3d1a;border-left:3px solid #c45d2c;padding:.6rem 1rem;font-size:.78rem;color:#bfb5a3;margin-bottom:.8rem"><strong style="color:#f0e6d3">Free tier</strong> — 10 items max. <a href="https://stockyard.dev/mirage/" target="_blank" style="color:#e8753a">Upgrade to Pro →</a></div><div class="overview" id="ov"></div><div id="svcList"></div><div id="detail" style="display:none;margin-top:1rem"></div></div><div id="modal"></div>
+func(s *Server)dashboard(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","text/html");w.Write([]byte(dashHTML))}
+const dashHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Mirage</title>
+<style>:root{--bg:#1a1410;--bg2:#241e18;--bg3:#2e261e;--rust:#e8753a;--leather:#a0845c;--cream:#f0e6d3;--cd:#bfb5a3;--cm:#7a7060;--gold:#d4a843;--green:#4a9e5c;--mono:'JetBrains Mono',monospace}
+*{margin:0;padding:0;box-sizing:border-box}body{background:var(--bg);color:var(--cream);font-family:var(--mono);line-height:1.5}
+.hdr{padding:1rem 1.5rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}.hdr h1{font-size:.9rem;letter-spacing:2px}
+.main{padding:1.5rem;max-width:900px;margin:0 auto}
+.svc{background:var(--bg2);border:1px solid var(--bg3);margin-bottom:1rem}
+.svc-hdr{padding:.8rem 1rem;border-bottom:1px solid var(--bg3);display:flex;justify-content:space-between;align-items:center}
+.svc-name{font-size:.85rem;color:var(--cream)}.svc-prefix{font-size:.65rem;color:var(--gold)}
+.ep{display:flex;align-items:center;padding:.4rem 1rem;border-bottom:1px solid var(--bg3);font-size:.72rem}
+.ep:last-child{border:none}
+.ep-method{width:50px;text-align:center;font-size:.6rem;font-weight:bold;padding:.1rem;margin-right:.5rem}
+.ep-GET{color:#4a9e5c}.ep-POST{color:#d4a843}.ep-PUT{color:#4a7ec9}.ep-DELETE{color:#c94444}
+.ep-path{color:var(--cream);flex:1}
+.ep-status{font-size:.6rem;color:var(--cm);margin-left:.5rem}
+.ep-toggle{margin-left:.5rem}
+.btn{font-size:.6rem;padding:.25rem .6rem;cursor:pointer;border:1px solid var(--bg3);background:var(--bg);color:var(--cd)}.btn:hover{border-color:var(--leather);color:var(--cream)}
+.btn-p{background:var(--rust);border-color:var(--rust);color:var(--bg)}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center}.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--bg3);padding:1.5rem;width:500px;max-width:90vw;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:.8rem;margin-bottom:1rem;color:var(--rust)}
+.fr{margin-bottom:.5rem}.fr label{display:block;font-size:.55rem;color:var(--cm);text-transform:uppercase;letter-spacing:1px;margin-bottom:.15rem}
+.fr input,.fr select,.fr textarea{width:100%;padding:.35rem .5rem;background:var(--bg);border:1px solid var(--bg3);color:var(--cream);font-family:var(--mono);font-size:.7rem}
+.acts{display:flex;gap:.4rem;justify-content:flex-end;margin-top:.8rem}
+.empty{text-align:center;padding:3rem;color:var(--cm);font-style:italic;font-size:.75rem}
+</style></head><body>
+<div class="hdr"><h1>MIRAGE</h1><div style="display:flex;gap:.4rem"><button class="btn btn-p" onclick="openEp()">+ Endpoint</button><button class="btn" onclick="openSvc()">+ Service</button></div></div>
+<div class="main" id="main"></div>
+<div class="modal-bg" id="mbg" onclick="if(event.target===this)cm()"><div class="modal" id="mdl"></div></div>
 <script>
-let svcs=[],curSvc='';
-async function api(u,o){return(await fetch(u,o)).json()}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-function timeAgo(d){if(!d)return'';const s=Math.floor((Date.now()-new Date(d))/1e3);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';return Math.floor(s/3600)+'h ago'}
-async function init(){const[sd,dd]=await Promise.all([api('/api/stats'),api('/api/services')]);svcs=dd.services||[];
-document.getElementById('ov').innerHTML='<div class="stat"><b>'+sd.services+'</b>Services</div><div class="stat"><b>'+sd.endpoints+'</b>Endpoints</div><div class="stat"><b>'+sd.requests+'</b>Requests</div>';
-document.getElementById('svcList').innerHTML=svcs.length?svcs.map(s=>'<div class="card" onclick="openSvc(\''+s.id+'\')"><h3>'+esc(s.name)+(s.prefix?' <span style="color:var(--cm);font-size:.7rem">'+esc(s.prefix)+'</span>':'')+'</h3><div class="card-meta"><span>'+s.endpoint_count+' endpoints</span></div></div>').join(''):'<div class="empty">No mock services yet. Create one to define mock endpoints.</div>'}
-async function openSvc(id){curSvc=id;const[svc,ed]=await Promise.all([api('/api/services/'+id),api('/api/services/'+id+'/endpoints')]);
-const eps=(ed.endpoints||[]).map(e=>'<div class="ep-row"><span class="ep-method m-'+e.method+'">'+e.method+'</span><span class="ep-path">/mock'+esc(e.path)+'</span><span class="ep-status s-'+String(e.status_code)[0]+'">'+e.status_code+'</span>'+(e.delay_ms?'<span style="color:var(--cm);font-size:.6rem">'+e.delay_ms+'ms</span>':'')+'<span style="cursor:pointer;font-size:.55rem;color:var(--cm)" onclick="delEP(\''+e.id+'\')">del</span></div>').join('');
-document.getElementById('detail').style.display='block';
-document.getElementById('detail').innerHTML='<div style="display:flex;justify-content:space-between;margin-bottom:.5rem"><span style="font-size:.75rem;color:var(--leather)">'+esc(svc.name)+'</span><button class="btn btn-d" onclick="if(confirm(\'Delete?\'))delSvc(\''+id+'\')">Del</button></div><div style="font-size:.65rem;color:var(--cm);margin-bottom:.5rem">Mock base: <span style="color:var(--rl)">/mock</span></div>'+(eps||'<div class="empty" style="padding:1rem">No endpoints.</div>')}
-async function delSvc(id){await api('/api/services/'+id,{method:'DELETE'});curSvc='';document.getElementById('detail').style.display='none';init()}
-async function delEP(id){await api('/api/endpoints/'+id,{method:'DELETE'});openSvc(curSvc);init()}
-function showNewSvc(){document.getElementById('modal').innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h2>New Mock Service</h2><label class="fl">Name</label><input type="text" id="ns-name" placeholder="Payment API"><label class="fl">Description</label><input type="text" id="ns-desc"><div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn btn-p" onclick="saveSvc()">Create</button><button class="btn btn-d" onclick="closeModal()">Cancel</button></div></div></div>'}
-async function saveSvc(){const b={name:document.getElementById('ns-name').value,description:document.getElementById('ns-desc').value};if(!b.name){alert('Required');return};const r=await api('/api/services',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});curSvc=r.id;closeModal();init();openSvc(r.id)}
-function showNewEP(){if(!curSvc){alert('Select a service first');return}
-document.getElementById('modal').innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h2>New Mock Endpoint</h2><div class="form-row"><div><label class="fl">Method</label><select id="ne-method"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option></select></div><div><label class="fl">Path</label><input type="text" id="ne-path" placeholder="/api/users"></div></div><div class="form-row"><div><label class="fl">Status Code</label><input type="number" id="ne-status" value="200"></div><div><label class="fl">Delay (ms)</label><input type="number" id="ne-delay" value="0"></div></div><label class="fl">Response Body</label><textarea id="ne-body" rows="5" placeholder=\'{"users":[{"id":1,"name":"Alice"}]}\'></textarea><div style="display:flex;gap:.5rem;margin-top:1rem"><button class="btn btn-p" onclick="saveEP()">Create</button><button class="btn btn-d" onclick="closeModal()">Cancel</button></div></div></div>'}
-async function saveEP(){const b={service_id:curSvc,method:document.getElementById('ne-method').value,path:document.getElementById('ne-path').value,status_code:parseInt(document.getElementById('ne-status').value)||200,delay_ms:parseInt(document.getElementById('ne-delay').value)||0,response_body:document.getElementById('ne-body').value};if(!b.path){alert('Path required');return};await api('/api/endpoints',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});closeModal();openSvc(curSvc);init()}
-function closeModal(){document.getElementById('modal').innerHTML=''}
-init()
-fetch('/api/tier').then(r=>r.json()).then(j=>{if(j.tier==='free'){var b=document.getElementById('upgrade-banner');if(b)b.style.display='block'}}).catch(()=>{var b=document.getElementById('upgrade-banner');if(b)b.style.display='block'});
+const A='/api';let services=[],endpoints=[];
+async function load(){const[s,e]=await Promise.all([fetch(A+'/services').then(r=>r.json()),fetch(A+'/endpoints').then(r=>r.json())]);
+services=s.services||[];endpoints=e.endpoints||[];render();}
+function render(){if(!services.length&&!endpoints.length){document.getElementById('main').innerHTML='<div class="empty">No mock services. Create a service and add endpoints.</div>';return;}
+let h='';services.forEach(s=>{
+const eps=endpoints.filter(e=>e.service_id===s.id);
+h+='<div class="svc"><div class="svc-hdr"><div><span class="svc-name">'+esc(s.name)+'</span>';if(s.prefix)h+=' <span class="svc-prefix">'+esc(s.prefix)+'</span>';h+='</div><button class="btn" onclick="delSvc(\''+s.id+'\')" style="font-size:.5rem;color:var(--cm)">✕</button></div>';
+if(!eps.length)h+='<div class="empty" style="padding:1rem">No endpoints</div>';
+eps.forEach(e=>{h+='<div class="ep"><span class="ep-method ep-'+e.method+'">'+e.method+'</span><span class="ep-path">'+esc(e.path)+'</span><span class="ep-status">→ '+e.status_code;if(e.delay_ms)h+=' ('+e.delay_ms+'ms delay)';h+='</span><button class="btn" onclick="delEp(\''+e.id+'\')" style="font-size:.5rem;color:var(--cm);margin-left:.3rem">✕</button></div>';});
+h+='</div>';});
+// Unattached endpoints
+const orphans=endpoints.filter(e=>!services.find(s=>s.id===e.service_id));
+if(orphans.length){h+='<div class="svc"><div class="svc-hdr"><span class="svc-name">(unattached)</span></div>';orphans.forEach(e=>{h+='<div class="ep"><span class="ep-method ep-'+e.method+'">'+e.method+'</span><span class="ep-path">'+esc(e.path)+'</span><span class="ep-status">→ '+e.status_code+'</span></div>';});h+='</div>';}
+document.getElementById('main').innerHTML=h;}
+async function delSvc(id){if(confirm('Delete service and all endpoints?')){await fetch(A+'/services/'+id,{method:'DELETE'});load();}}
+async function delEp(id){await fetch(A+'/endpoints/'+id,{method:'DELETE'});load();}
+function openSvc(){document.getElementById('mdl').innerHTML='<h2>New Mock Service</h2><div class="fr"><label>Name</label><input id="f-n" placeholder="e.g. Payment API"></div><div class="fr"><label>URL Prefix</label><input id="f-p" placeholder="/api/payments"></div><div class="fr"><label>Description</label><input id="f-d"></div><div class="acts"><button class="btn" onclick="cm()">Cancel</button><button class="btn btn-p" onclick="subSvc()">Create</button></div>';document.getElementById('mbg').classList.add('open');}
+async function subSvc(){await fetch(A+'/services',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:document.getElementById('f-n').value,prefix:document.getElementById('f-p').value,description:document.getElementById('f-d').value})});cm();load();}
+function openEp(){let opts=services.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+document.getElementById('mdl').innerHTML='<h2>New Mock Endpoint</h2><div class="fr"><label>Service</label><select id="f-s">'+opts+'</select></div><div class="fr"><label>Method</label><select id="f-m"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></div><div class="fr"><label>Path</label><input id="f-path" placeholder="/users/{id}"></div><div class="fr"><label>Response Status</label><input id="f-st" type="number" value="200"></div><div class="fr"><label>Response Body</label><textarea id="f-body" rows="6" placeholder=\'{"id":1,"name":"Mock User"}\'></textarea></div><div class="fr"><label>Delay (ms)</label><input id="f-delay" type="number" value="0"></div><div class="acts"><button class="btn" onclick="cm()">Cancel</button><button class="btn btn-p" onclick="subEp()">Create</button></div>';document.getElementById('mbg').classList.add('open');}
+async function subEp(){await fetch(A+'/endpoints',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({service_id:document.getElementById('f-s').value,method:document.getElementById('f-m').value,path:document.getElementById('f-path').value,status_code:parseInt(document.getElementById('f-st').value),response_body:document.getElementById('f-body').value,delay_ms:parseInt(document.getElementById('f-delay').value)||0})});cm();load();}
+function cm(){document.getElementById('mbg').classList.remove('open');}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+load();
 </script></body></html>`
